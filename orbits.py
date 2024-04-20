@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.linalg import null_space
 from tqdm import tqdm
 
 
@@ -54,14 +55,12 @@ def circ_orbit_vel(dist):
 
 
 # Initial conditions
-origin = np.zeros(3)
-x0 = np.array([40, 10])
-# x0 = np.random.uniform(-50, 50, size=2)
-x0 = np.pad(x0, (0, 1), mode='constant')
+origin = np.zeros(2)
+th = np.random.uniform(-HALF_PI, HALF_PI)
+x0 = rotate(np.array([40, 0, 0]), th)
 # v0 = np.array([0, 3])
-# v0 = np.random.uniform(-2, 2, size=2)
-v0 = np.array([0, circ_orbit_vel(100)])
-v0 = np.pad(v0, (0, 1), mode='constant')
+phi = np.random.uniform(-HALF_PI, HALF_PI)
+v0 = rotate(np.array([0, circ_orbit_vel(100), 0]), phi)
 xs = np.zeros((N, 3))
 vs = np.zeros((N, 3))
 
@@ -78,19 +77,11 @@ def GAcc(x):
 
 
 if __name__ == "__main__":
-    # Main loop
-    a0 = GAcc(x0)
-    a = a0
-    # for i, x in enumerate(tqdm(xs[1:-1]), 1):
-    #     xs[i+1] = xs[i] + vs[i]*dt + 0.5*a*dt2
-    #     a_new = GAcc(xs[i+1])
-    #     vs[i+1] = vs[i] + 0.5*(a+a_new)*dt
-    #     a = a_new
-
     # Calculate eccentricity
     r = xs[0]
     v = vs[0]
     h = np.cross(r, v)
+    h2 = np.dot(h, h)
     e_vec = MU_inv * np.cross(v, h) - unit(r)
     e = np.linalg.norm(e_vec)
     e_hat = unit(e_vec)
@@ -98,33 +89,40 @@ if __name__ == "__main__":
     # Calculate 5 points on ellipse
     pt_x = xs[0]
     assert 0 <= e <= 1, f"e={e}, and for now we only drawing ellipses."
-    pt_p = e_vec  # perigee point
-    rp = np.linalg.norm(pt_p)  # perigee distance
+    rp = h2*MU_inv / (1+e)  # perigee distance
+    pt_p = rp * e_hat  # perigee point
     if e == 0:  # circle
         ra = rp
     elif e > 0:  # non-circular ellipse
         ra = rp * (1+e) / (1-e)
-        print(ra, rp)
     else:  # something went wrong
         raise ValueError(f"e = {e} < 0.")
     A = ra + rp  # major axis length
     B = A * np.sqrt(1-e**2)  # minor axis length
-    exit()
     assert B <= A, f"Minor axis (b={B}) is bigger than major axis (a={A})!"
     pt_a = pt_p - e_hat * A  # apogee point
     pt_c = 0.5 * (pt_a + pt_p)  # center of ellipse
-    minor_dir = rotate(e_hat, HALF_PI)[0]  # direction of MINOR axis
+    minor_dir = np.array([-e_hat[1], e_hat[0], 0])  # direction of MINOR axis
     pt_b1 = pt_c + 0.5 * B * minor_dir
     pt_b2 = pt_c - 0.5 * B * minor_dir
 
-    print(
-        f"""
-Px = {pt_x},
-Pp = {pt_p},
-Pa = {pt_a},
-Pb1 = {pt_b1},
-Pb2 = {pt_b2}
-        """)
+    # Get conic coefficients
+    CMat = np.array([
+        [pt[0]**2, pt[0]*pt[1], pt[1]**2, pt[0], pt[1], 1]
+        for pt in [pt_x, pt_p, pt_a, pt_b1, pt_b2]
+    ])
+    ns = null_space(CMat)
+    ns = ns * np.copysign(1, ns[0, 0])
+    A, B, C, D, E, F = [x[0] for x in ns]
+
+    # Numeric integration loop
+    a0 = GAcc(x0)
+    a = a0
+    for i, x in enumerate(tqdm(xs[1:-1]), 1):
+        xs[i+1] = xs[i] + vs[i]*dt + 0.5*a*dt2
+        a_new = GAcc(xs[i+1])
+        vs[i+1] = vs[i] + 0.5*(a+a_new)*dt
+        a = a_new
 
     # # Data gathering?
     # dists = np.linalg.norm(xs, axis=1)
@@ -174,30 +172,40 @@ Pb2 = {pt_b2}
 
     # Graphics
     fig, ax = plt.subplots()
-    ax.plot(xs[:, 0], xs[:, 1])
+    # ax.plot(xs[:, 0], xs[:, 1])
     ax.set(xlabel="x", ylabel="y", title="Test orbit")
     ax.grid()
     plt.axis("equal")
     star_circle = plt.Circle((0, 0), 1.5, color="r")
     px_circle = plt.Circle(pt_x, 1, color="g")
-    pp_circle = plt.Circle(pt_p, 1, color="b")
-    pa_circle = plt.Circle(pt_a, 1, color="orange")
-    pb1_circle = plt.Circle(pt_b1, 1, color="purple")
-    pb2_circle = plt.Circle(pt_b2, 1, color="cyan")
+    # pp_circle = plt.Circle(pt_p, 1, color="b")
+    # pa_circle = plt.Circle(pt_a, 1, color="orange")
+    # pc_circle = plt.Circle(pt_c, 1, color="purple")
+    # pb1_circle = plt.Circle(pt_b1, 1, color="purple")
+    # pb2_circle = plt.Circle(pt_b2, 1, color="cyan")
     # equinox_circle = plt.Circle(pos_equinox, 1, color="g")
     ax.add_patch(star_circle)
     ax.add_patch(px_circle)
-    ax.add_patch(pp_circle)
-    ax.add_patch(pa_circle)
-    ax.add_patch(pb1_circle)
-    ax.add_patch(pb2_circle)
+    # ax.add_patch(pp_circle)
+    # ax.add_patch(pa_circle)
+    # ax.add_patch(pc_circle)
+    # ax.add_patch(pb1_circle)
+    # ax.add_patch(pb2_circle)
+
+    # Draw analytic orbit
+    # A, B, C, D, E, F = 1, 0, 1, 0, 0, -2
+    x = np.linspace(-20, 20, 400)
+    y = np.linspace(-20, 20, 400)
+    x, y = np.meshgrid(x, y)
+    plt.contour(x, y, (A*x**2 + B*x*y + C*y**2 +
+                D*x + E*y + F), [0], colors='k')
     # plt.quiver(
-    #     *origin, semi_major_dir[0], semi_major_dir[1],
-    #     color="green", scale=10
+    #     *origin, e_hat[0], e_hat[1],
+    #     color="g", scale=5
     # )
     # plt.quiver(
-    #     *origin, semi_minor_dir[0], semi_minor_dir[1],
-    #     color="orange", scale=10
+    #     *origin, minor_dir[0], minor_dir[1],
+    #     color="orange", scale=5
     # )
     plt.show()
 
