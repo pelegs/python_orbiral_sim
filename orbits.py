@@ -81,58 +81,96 @@ if __name__ == "__main__":
     # Main loop
     a0 = GAcc(x0)
     a = a0
-    for i, x in enumerate(tqdm(xs[1:-1]), 1):
-        xs[i+1] = xs[i] + vs[i]*dt + 0.5*a*dt2
-        a_new = GAcc(xs[i+1])
-        vs[i+1] = vs[i] + 0.5*(a+a_new)*dt
-        a = a_new
+    # for i, x in enumerate(tqdm(xs[1:-1]), 1):
+    #     xs[i+1] = xs[i] + vs[i]*dt + 0.5*a*dt2
+    #     a_new = GAcc(xs[i+1])
+    #     vs[i+1] = vs[i] + 0.5*(a+a_new)*dt
+    #     a = a_new
 
-    # Data gathering?
-    dists = np.linalg.norm(xs, axis=1)
-    min_dist = np.min(dists)
-    max_dist = np.max(dists)
-    semi_major = (min_dist + max_dist) / 2
-    # print(f"Min: {min_dist}, max: {max_dist}, SMA: {semi_major}")
-
-    # Orbital eccentricity from geometry
-    speeds = np.linalg.norm(vs, axis=1)
-    idx_dist_min = dists.argmin()
-    idx_dist_max = dists.argmax()
-    idx_vel_min = speeds.argmin()
-    idx_vel_max = speeds.argmax()
-    pos_min = xs[idx_dist_min]
-    pos_max = xs[idx_dist_max]
-    semi_major = pos_max - pos_min
-    semi_major_dir = unit(semi_major)
-    la = np.linalg.norm(semi_major)
-    semi_minor_dir = rotate(semi_major_dir, HALF_PI)
-    vs_dot_semi_minor = np.abs(np.dot(vs, semi_minor_dir))
-    idx_equinox_1 = vs_dot_semi_minor.argmin()
-    pos_equinox_1 = xs[idx_equinox_1]
-    vel_equinox_1 = vs[idx_equinox_1]
-    ellipse_center = get_intersection(
-        pos_min, semi_major_dir, pos_equinox_1, semi_minor_dir
-    )
-    pos_equinox_2 = pos_equinox_1 + 2*(ellipse_center-pos_equinox_1)
-    lb = np.linalg.norm(pos_equinox_2-pos_equinox_1)
-    ecc = np.sqrt(1-lb**2/la**2)
-
-    # Orbital eccentricity from mechanics
-    idx = np.random.randint(len(xs))
-    r = xs[idx]
-    v = vs[idx]
+    # Calculate eccentricity
+    r = xs[0]
+    v = vs[0]
     h = np.cross(r, v)
     e_vec = MU_inv * np.cross(v, h) - unit(r)
     e = np.linalg.norm(e_vec)
+    e_hat = unit(e_vec)
 
-    # Compare eccentricities
-    ecc_diff = abs(e-ecc)
-    ecc_err = ecc_diff / e
+    # Calculate 5 points on ellipse
+    pt_x = xs[0]
+    assert 0 <= e <= 1, f"e={e}, and for now we only drawing ellipses."
+    pt_p = e_vec  # perigee point
+    rp = np.linalg.norm(pt_p)  # perigee distance
+    if e == 0:  # circle
+        ra = rp
+    elif e > 0:  # non-circular ellipse
+        ra = rp * (1+e) / (1-e)
+        print(ra, rp)
+    else:  # something went wrong
+        raise ValueError(f"e = {e} < 0.")
+    A = ra + rp  # major axis length
+    B = A * np.sqrt(1-e**2)  # minor axis length
+    exit()
+    assert B <= A, f"Minor axis (b={B}) is bigger than major axis (a={A})!"
+    pt_a = pt_p - e_hat * A  # apogee point
+    pt_c = 0.5 * (pt_a + pt_p)  # center of ellipse
+    minor_dir = rotate(e_hat, HALF_PI)[0]  # direction of MINOR axis
+    pt_b1 = pt_c + 0.5 * B * minor_dir
+    pt_b2 = pt_c - 0.5 * B * minor_dir
+
     print(
-        f"geometric e = {ecc:0.3f}, mechanical e = {e:0.3f}, "
-        f"diff = {ecc_diff:0.3f} ({ecc_err*100:0.3f}%)"
-    )
+        f"""
+Px = {pt_x},
+Pp = {pt_p},
+Pa = {pt_a},
+Pb1 = {pt_b1},
+Pb2 = {pt_b2}
+        """)
 
+    # # Data gathering?
+    # dists = np.linalg.norm(xs, axis=1)
+    # min_dist = np.min(dists)
+    # max_dist = np.max(dists)
+    # semi_major = (min_dist + max_dist) / 2
+    # # print(f"Min: {min_dist}, max: {max_dist}, SMA: {semi_major}")
+    #
+    # # Orbital eccentricity from geometry
+    # speeds = np.linalg.norm(vs, axis=1)
+    # idx_dist_min = dists.argmin()
+    # idx_dist_max = dists.argmax()
+    # idx_vel_min = speeds.argmin()
+    # idx_vel_max = speeds.argmax()
+    # pos_min = xs[idx_dist_min]
+    # pos_max = xs[idx_dist_max]
+    # semi_major = pos_max - pos_min
+    # semi_major_dir = unit(semi_major)
+    # la = np.linalg.norm(semi_major)
+    # semi_minor_dir = rotate(semi_major_dir, HALF_PI)
+    # vs_dot_semi_minor = np.abs(np.dot(vs, semi_minor_dir))
+    # idx_equinox_1 = vs_dot_semi_minor.argmin()
+    # pos_equinox_1 = xs[idx_equinox_1]
+    # vel_equinox_1 = vs[idx_equinox_1]
+    # ellipse_center = get_intersection(
+    #     pos_min, semi_major_dir, pos_equinox_1, semi_minor_dir
+    # )
+    # pos_equinox_2 = pos_equinox_1 + 2*(ellipse_center-pos_equinox_1)
+    # lb = np.linalg.norm(pos_equinox_2-pos_equinox_1)
+    # ecc = np.sqrt(1-lb**2/la**2)
+    #
+    # # Orbital eccentricity from mechanics
+    # idx = np.random.randint(len(xs))
+    # r = xs[idx]
+    # v = vs[idx]
+    # h = np.cross(r, v)
+    # e_vec = MU_inv * np.cross(v, h) - unit(r)
+    # e = np.linalg.norm(e_vec)
+    #
+    # # Compare eccentricities
+    # ecc_diff = abs(e-ecc)
+    # ecc_err = ecc_diff / e
+    # print(
+    #     f"geometric e = {ecc:0.3f}, mechanical e = {e:0.3f}, "
+    #     f"diff = {ecc_diff:0.3f} ({ecc_err*100:0.3f}%)"
+    # )
 
     # Graphics
     fig, ax = plt.subplots()
@@ -141,19 +179,18 @@ if __name__ == "__main__":
     ax.grid()
     plt.axis("equal")
     star_circle = plt.Circle((0, 0), 1.5, color="r")
-    pos_min_circle = plt.Circle(pos_min, 1, color="g")
-    pos_max_circle = plt.Circle(pos_max, 1, color="g")
-    pos_equinox_1_circle = plt.Circle(pos_equinox_1, 1, color="orange")
-    pos_center_circle = plt.Circle(ellipse_center, 1, color="blue")
-    pos_equinox_2_circle = plt.Circle(pos_equinox_2, 1, color="orange")
+    px_circle = plt.Circle(pt_x, 1, color="g")
+    pp_circle = plt.Circle(pt_p, 1, color="b")
+    pa_circle = plt.Circle(pt_a, 1, color="orange")
+    pb1_circle = plt.Circle(pt_b1, 1, color="purple")
+    pb2_circle = plt.Circle(pt_b2, 1, color="cyan")
     # equinox_circle = plt.Circle(pos_equinox, 1, color="g")
     ax.add_patch(star_circle)
-    ax.add_patch(pos_min_circle)
-    ax.add_patch(pos_max_circle)
-    ax.add_patch(pos_equinox_1_circle)
-    ax.add_patch(pos_center_circle)
-    ax.add_patch(pos_equinox_2_circle)
-    # ax.add_patch(equinox_circle)
+    ax.add_patch(px_circle)
+    ax.add_patch(pp_circle)
+    ax.add_patch(pa_circle)
+    ax.add_patch(pb1_circle)
+    ax.add_patch(pb2_circle)
     # plt.quiver(
     #     *origin, semi_major_dir[0], semi_major_dir[1],
     #     color="green", scale=10
