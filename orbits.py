@@ -116,13 +116,13 @@ if __name__ == "__main__":
     A, B, C, D, E, F = [x[0] for x in ns]
 
     # Numeric integration loop
-    a0 = GAcc(x0)
-    a = a0
-    for i, x in enumerate(tqdm(xs[1:-1]), 1):
-        xs[i+1] = xs[i] + vs[i]*dt + 0.5*a*dt2
-        a_new = GAcc(xs[i+1])
-        vs[i+1] = vs[i] + 0.5*(a+a_new)*dt
-        a = a_new
+    # a0 = GAcc(x0)
+    # a = a0
+    # for i, x in enumerate(tqdm(xs[1:-1]), 1):
+    #     xs[i+1] = xs[i] + vs[i]*dt + 0.5*a*dt2
+    #     a_new = GAcc(xs[i+1])
+    #     vs[i+1] = vs[i] + 0.5*(a+a_new)*dt
+    #     a = a_new
 
     # # Data gathering?
     # dists = np.linalg.norm(xs, axis=1)
@@ -193,10 +193,15 @@ if __name__ == "__main__":
     # ax.add_patch(pb2_circle)
 
     # Draw analytic orbit
-    # A, B, C, D, E, F = 1, 0, 1, 0, 0, -2
-    x = np.linspace(-20, 20, 400)
-    y = np.linspace(-20, 20, 400)
+    def axes():
+        plt.axhline(0, alpha=.1)
+        plt.axvline(0, alpha=.1)
+
+    x = np.linspace(-70, 70, 100)
+    y = np.linspace(-70, 70, 100)
     x, y = np.meshgrid(x, y)
+    assert B**2 - 4*A*C < 0
+    axes()
     plt.contour(x, y, (A*x**2 + B*x*y + C*y**2 +
                 D*x + E*y + F), [0], colors='k')
     # plt.quiver(
