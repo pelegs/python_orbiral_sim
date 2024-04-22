@@ -1,7 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 from scipy.linalg import null_space
-from tqdm import tqdm
+# from tqdm import tqdm
+
+
+# Numpy type hints
+NDArrayFloat = npt.NDArray[np.float_]
 
 
 def set_vec_len(vec, s):
