@@ -50,6 +50,11 @@ Line: pt0 = {self.pts[0]}, pt1 = {self.pts[1]}, direction = {self.dir}
 """
 
 
+class Conic():
+    """docstring for Conic."""
+    pass
+
+
 if __name__ == "__main__":
     pts: NDArrayFloat = np.random.randint(-10, 10, size=(2, 2))
     dir: NDArrayFloat = np.random.randint(-10, 10, size=2)
